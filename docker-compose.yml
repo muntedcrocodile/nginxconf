@@ -1,0 +1,65 @@
+version: "3.8"
+services:
+  duckdns:
+    image: lscr.io/linuxserver/duckdns:latest
+    container_name: duckdns
+    environment:
+      - SUBDOMAINS=ghost4
+      - TOKEN=${DUCKDNS_TOKEN}
+      - UPDATE_IP=ipv4 #optional
+      - LOG_FILE=true #optional
+    volumes:
+      - ./data/duckdns/config:/config #optional
+    restart: unless-stopped
+
+
+  certbot:
+    image: infinityofspace/certbot_dns_duckdns:latest
+    container_name: root_certbot
+    volumes:
+      - ./data/letsencrypt:/etc/letsencrypt
+      - ./data/log/letsencrypt:/var/log/letsencrypt
+    command: >
+      certonly
+      --non-interactive
+      --agree-tos
+      --email ${LETS_ENCRYPT_EMAIL}
+      --preferred-challenges dns
+      --authenticator dns-duckdns
+      --dns-duckdns-token ${DUCKDNS_TOKEN}
+      --dns-duckdns-propagation-seconds 30
+      -d "example.duckdns.org"
+      -d "*.example.duckdns.org"
+
+    depends_on:
+      - duckdns
+
+
+  nginx:
+    image: nginx:latest
+    container_name: root_nginx
+    restart: always
+    ports:
+      - "80:80" # only so nginx can redirect to https
+      - "443:443"
+    volumes:
+      - ./data/nginx/cache:/var/cache
+      - ./data/nginx/cache:/var/cache
+
+      - ./data/letsencrypt:/etc/letsencrypt
+      - ./data/nginx.conf:/etc/nginx/nginx.conf
+      
+      - ./data/sites-enabled:/etc/nginx/sites-enabled
+      - ./data/sites-available:/etc/nginx/sites-available
+      - ./data/snippets:/config/nginx/snippets
+
+    depends_on:
+      - certbot
+    networks:
+      - proxy
+      # - fedi_prox
+
+
+networks:
+  proxy:
+    external: true

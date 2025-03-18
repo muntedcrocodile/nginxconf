@@ -1,0 +1,6 @@
+.env
+data/*
+!data/nginx.conf
+!data/sites-available
+!data/sites-enabled
+!data/snippets
